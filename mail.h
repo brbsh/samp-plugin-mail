@@ -2,6 +2,7 @@
 
 #pragma warning(disable:4996)
 
+#include <stdlib.h>
 #include <vector>
 #include <iostream>
 #include <map>
@@ -9,9 +10,9 @@
 #include <queue>
 #include <memory>
 
+#include "sdk/amx/amx.h"
+#include "sdk/plugincommon.h"
 #include "jwsmtp/jwsmtp.h"
-#include "SDK/amx/amx.h"
-#include "SDK/plugincommon.h"
 
 //Kye's sleep macro
 #ifdef WIN32
