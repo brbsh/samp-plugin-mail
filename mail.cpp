@@ -58,7 +58,7 @@ PLUGIN_EXPORT bool PLUGIN_CALL Load(void **ppData)
 		DWORD dwThreadId = 0;
 		threadHandle = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)MailThread, NULL, 0, &dwThreadId);
 		CloseHandle(threadHandle);
-		mutexHandle = CreateMutex(NULL, FALSE, LPCSTR("pawnmail"));
+		mutexHandle = CreateMutex(NULL, FALSE, LPCWSTR("pawnmail"));
 	#else
 		pthread_t threadHandle;
 		pthread_attr_t attr;
@@ -132,9 +132,10 @@ PLUGIN_EXPORT void PLUGIN_CALL Unload()
 				}
 
 				mail.send();
-				mail_thread.error.assign(mail.response);
+
+				mail_thread.error.assign(mail.response());
 				mail_thread.errorCode = atoi(mail_thread.error.c_str());
-				
+
 				lockMutex();
 				mail_pt_queue.push(mail_thread);
 				unlockMutex();
@@ -175,7 +176,7 @@ PLUGIN_EXPORT void PLUGIN_CALL ProcessTick()
 						amx_PushString(*amx, &amx_Address[1], &phys_addr, mail_pt.subject.c_str(), 0, 0);
 						amx_PushString(*amx, &amx_Address[2], &phys_addr, mail_pt.to.c_str(), 0, 0);
 						amx_Push(*amx, mail_pt.index);
-						
+
 						amx_Exec(*amx, NULL, amx_Idx);
 
 						amx_Release(*amx, amx_Address[0]);
@@ -211,6 +212,8 @@ PLUGIN_EXPORT void PLUGIN_CALL ProcessTick()
 		}
 	}
 }
+
+
 
 //native mail_init(host[], user[], password[], from[], sendername[]);
 cell AMX_NATIVE_CALL n_mail_init(AMX *amx, cell *params)
@@ -250,6 +253,8 @@ cell AMX_NATIVE_CALL n_mail_init(AMX *amx, cell *params)
 	return 1;
 }
 
+
+
 // native mail_send(index, to[], subject[], messsage[], type = 0);
 cell AMX_NATIVE_CALL n_mail_send(AMX *amx, cell *params)
 {
@@ -257,7 +262,7 @@ cell AMX_NATIVE_CALL n_mail_send(AMX *amx, cell *params)
 	char *to;
 	char *subject;
 	char *message;
-	
+
 	push_to_thread.index = params[1];
 	amx_StrParam(amx, params[2], to);
 	amx_StrParam(amx, params[3], subject);
@@ -267,7 +272,7 @@ cell AMX_NATIVE_CALL n_mail_send(AMX *amx, cell *params)
 	push_to_thread.to.assign(to);
 	push_to_thread.subject.assign(subject);
 	push_to_thread.message.assign(message);
-	
+
 	push_to_thread.errorCode = 1;
 
 	lockMutex();
@@ -277,6 +282,8 @@ cell AMX_NATIVE_CALL n_mail_send(AMX *amx, cell *params)
 	return 1;
 }
 
+
+
 AMX_NATIVE_INFO PluginNatives[] =
 {
 	{"mail_init", n_mail_init},
@@ -284,12 +291,15 @@ AMX_NATIVE_INFO PluginNatives[] =
     	{NULL, NULL}
 };
 
+
+
 PLUGIN_EXPORT int PLUGIN_CALL AmxLoad(AMX *amx) 
 {
 	mail_amx_list.push_back(amx);
 
     	return amx_Register(amx, PluginNatives, -1);
 }
+
 
 
 PLUGIN_EXPORT int PLUGIN_CALL AmxUnload(AMX *amx) 
@@ -307,6 +317,8 @@ PLUGIN_EXPORT int PLUGIN_CALL AmxUnload(AMX *amx)
     	return AMX_ERR_NONE;
 } 
 
+
+
 void lockMutex()
 {
 	#ifdef WIN32
@@ -315,6 +327,8 @@ void lockMutex()
 		pthread_mutex_lock(&mutexHandle);
 	#endif
 }
+
+
 
 void unlockMutex()
 {

@@ -1,0 +1,8 @@
+LIBRARY	"mail"
+EXPORTS
+	Supports
+	Load
+	Unload
+	AmxLoad
+	AmxUnload
+	ProcessTick
