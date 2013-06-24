@@ -47,6 +47,7 @@ local.properties
 *_i.c
 *_p.c
 *.exp
+*.filters
 *.ilk
 *.lib
 *.meta
