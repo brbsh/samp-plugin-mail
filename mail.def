@@ -1,4 +1,3 @@
-LIBRARY	"mail"
 EXPORTS
 	Supports
 	Load

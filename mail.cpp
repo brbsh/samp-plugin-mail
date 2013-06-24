@@ -1,42 +1,24 @@
+#pragma once
+
+
+
 #include "mail.h"
 
-#ifdef WIN32
-	HANDLE threadHandle;
-	HANDLE mutexHandle;
-	DWORD __stdcall MailThread(LPVOID lpParam);
-#else
-	pthread_mutex_t mutexHandle;
-	void * MailThread(void *lpParam);
-#endif
 
 
 
-typedef void (*logprintf_t)(char* format, ...);
+
 logprintf_t logprintf;
+
 extern void *pAMXFunctions;
+extern amxProcess *gProcess;
 
-void lockMutex();
-void unlockMutex();
+boost::mutex gMutex;
+boost::regex gExpression;
 
-
-
-struct mail_struct
-{
-	int index;
-	std::string to;
-	std::string subject;
-	std::string message;
-	short type;
-	std::string error;
-	int errorCode;
-};
-
-
-
-std::list<AMX*> mail_amx_list;
-std::queue<mail_struct> mail_thread_queue;
-std::queue<mail_struct> mail_pt_queue;
-std::map<std::string, std::string> mail_config;
+std::list<AMX *> amxList;
+std::queue<mailData> amxThreadQueue;
+std::queue<mailData> amxProcessTickQueue;
 
 
 
@@ -44,297 +26,127 @@ std::map<std::string, std::string> mail_config;
 
 PLUGIN_EXPORT unsigned int PLUGIN_CALL Supports() 
 {
-    	return SUPPORTS_VERSION | SUPPORTS_AMX_NATIVES | SUPPORTS_PROCESS_TICK;
+    return (SUPPORTS_VERSION | SUPPORTS_AMX_NATIVES | SUPPORTS_PROCESS_TICK);
 }
 
 
 
 PLUGIN_EXPORT bool PLUGIN_CALL Load(void **ppData) 
 {
-    	pAMXFunctions = ppData[PLUGIN_DATA_AMX_EXPORTS];
-    	logprintf = (logprintf_t)ppData[PLUGIN_DATA_LOGPRINTF];
+    pAMXFunctions = ppData[PLUGIN_DATA_AMX_EXPORTS];
+    logprintf = (logprintf_t)ppData[PLUGIN_DATA_LOGPRINTF];
 
-	#ifdef WIN32
-		DWORD dwThreadId = 0;
-		threadHandle = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)MailThread, NULL, 0, &dwThreadId);
-		CloseHandle(threadHandle);
-		mutexHandle = CreateMutex(NULL, FALSE, LPCWSTR("pawnmail"));
-	#else
-		pthread_t threadHandle;
-		pthread_attr_t attr;
-		pthread_attr_init(&attr);
-		pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-		pthread_create(&threadHandle, &attr, &MailThread, NULL);
-		mutexHandle = PTHREAD_MUTEX_INITIALIZER;
-	#endif
-	
+	gExpression = "[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?";
+	gProcess = new amxProcess();
+	boost::thread mail(&amxProcess::Thread);
+
 	logprintf("  Mail plugin loaded");
 
-    	return true;
+    return true;
 }
 
 
 
 PLUGIN_EXPORT void PLUGIN_CALL Unload()
 {
-	#ifdef WIN32
-		CloseHandle(mutexHandle);
-	#else
-		pthread_mutex_destroy(&mutexHandle);
-	#endif
-
-	mail_amx_list.clear();
+	delete[] gProcess;
+	amxList.clear();
 
 	logprintf("  Mail plugin unloaded");
 }
 
 
 
-#ifdef WIN32
-	DWORD __stdcall MailThread(LPVOID lpParam)
-#else
-	void * MailThread(void *lpParam)
-#endif
-{
-	mail_struct mail_thread;
-	jwsmtp::mailer mail;
-
-	while(true)
-	{
-		if(!mail_thread_queue.empty())
-		{
-			for(unsigned int i = 0; i < mail_thread_queue.size(); i++)
-			{
-				lockMutex();
-				mail_thread = mail_thread_queue.front();
-				mail_thread_queue.pop();
-				unlockMutex();
-
-				mail.addrecipient(mail_thread.to);
-				mail.setsubject(mail_thread.subject);
-				mail.setmessage(mail_thread.message);
-
-				lockMutex();
-
-				mail.setsender(mail_config.find("from")->second);
-				mail.setsendername(mail_config.find("sendername")->second);
-
-				mail.setserver(mail_config.find("host")->second);
-				mail.username(mail_config.find("user")->second);
-				mail.password(mail_config.find("password")->second);
-
-				unlockMutex();
-
-				if(mail_thread.type)
-				{
-					mail.setmessage(" ");
-					mail.setmessageHTML(mail_thread.message);
-				}
-
-				mail.send();
-
-				mail_thread.error.assign(mail.response());
-				mail_thread.errorCode = atoi(mail_thread.error.c_str());
-
-				lockMutex();
-				mail_pt_queue.push(mail_thread);
-				unlockMutex();
-			}
-		}
-
-		SLEEP(1);
-	}
-}
-
-
-
-PLUGIN_EXPORT void PLUGIN_CALL ProcessTick()
-{
-	mail_struct mail_pt;
-
-	cell amx_Address[4], *phys_addr; 
-	int amx_Idx;
-
-	if(!mail_pt_queue.empty())
-	{
-		for(unsigned int i = 0; i < mail_pt_queue.size(); i++)
-		{
-			lockMutex();
-			mail_pt = mail_pt_queue.front();
-			mail_pt_queue.pop();
-			unlockMutex();
-
-			if(mail_pt.errorCode == 250)
-			{
-				for(std::list<AMX*>::iterator amx = mail_amx_list.begin(); amx != mail_amx_list.end(); amx++)
-				{
-					if(!amx_FindPublic(*amx, "OnMailSendSuccess", &amx_Idx))
-					{
-						//forward OnMailSendSuccess(index, to[], subject[], message[], type);
-						amx_Push(*amx, mail_pt.type);
-						amx_PushString(*amx, &amx_Address[0], &phys_addr, mail_pt.message.c_str(), 0, 0);
-						amx_PushString(*amx, &amx_Address[1], &phys_addr, mail_pt.subject.c_str(), 0, 0);
-						amx_PushString(*amx, &amx_Address[2], &phys_addr, mail_pt.to.c_str(), 0, 0);
-						amx_Push(*amx, mail_pt.index);
-
-						amx_Exec(*amx, NULL, amx_Idx);
-
-						amx_Release(*amx, amx_Address[0]);
-						amx_Release(*amx, amx_Address[1]);
-						amx_Release(*amx, amx_Address[2]);
-					}
-				}
-			}
-			else
-			{
-				for(std::list<AMX*>::iterator amx = mail_amx_list.begin(); amx != mail_amx_list.end(); amx++)
-				{
-					if(!amx_FindPublic(*amx, "OnMailSendError", &amx_Idx))
-					{
-						//forward OnMailSendError(index, to[], subject[], message[], type, error[], error_code);
-						amx_Push(*amx, mail_pt.errorCode);
-						amx_PushString(*amx, &amx_Address[0], &phys_addr, mail_pt.error.c_str(), 0, 0);
-						amx_Push(*amx, mail_pt.type);
-						amx_PushString(*amx, &amx_Address[1], &phys_addr, mail_pt.message.c_str(), 0, 0);
-						amx_PushString(*amx, &amx_Address[2], &phys_addr, mail_pt.subject.c_str(), 0, 0);
-						amx_PushString(*amx, &amx_Address[3], &phys_addr, mail_pt.to.c_str(), 0, 0);
-						amx_Push(*amx, mail_pt.index);
-
-						amx_Exec(*amx, NULL, amx_Idx);
-						
-						amx_Release(*amx, amx_Address[0]);
-						amx_Release(*amx, amx_Address[1]);
-						amx_Release(*amx, amx_Address[2]);
-						amx_Release(*amx, amx_Address[3]);
-					}
-				}
-			}
-		}
-	}
-}
-
-
-
-//native mail_init(host[], user[], password[], from[], sendername[]);
-cell AMX_NATIVE_CALL n_mail_init(AMX *amx, cell *params)
-{
-	char *host;
-	char *user;
-	char *password;
-	char *from;
-	char *sendername;
-	std::string temp;
-
-	amx_StrParam(amx, params[1], host);
-	amx_StrParam(amx, params[2], user);
-	amx_StrParam(amx, params[3], password);
-	amx_StrParam(amx, params[4], from);
-	amx_StrParam(amx, params[5], sendername);
-
-	lockMutex();
-
-	temp.assign(host);
-	mail_config["host"] = temp;
-
-	temp.assign(user);
-	mail_config["user"] = temp;
-
-	temp.assign(password);
-	mail_config["password"] = temp;
-
-	temp.assign(from);
-	mail_config["from"] = temp;
-
-	temp.assign(sendername);
-	mail_config["sendername"] = temp;
-
-	unlockMutex();
-
-	return 1;
-}
-
-
-
-// native mail_send(index, to[], subject[], messsage[], type = 0);
-cell AMX_NATIVE_CALL n_mail_send(AMX *amx, cell *params)
-{
-	mail_struct push_to_thread;
-	char *to;
-	char *subject;
-	char *message;
-
-	push_to_thread.index = params[1];
-	amx_StrParam(amx, params[2], to);
-	amx_StrParam(amx, params[3], subject);
-	amx_StrParam(amx, params[4], message);
-	push_to_thread.type = (short)params[5];
-
-	push_to_thread.to.assign(to);
-	push_to_thread.subject.assign(subject);
-	push_to_thread.message.assign(message);
-
-	push_to_thread.errorCode = 1;
-
-	lockMutex();
-	mail_thread_queue.push(push_to_thread);
-	unlockMutex();
-
-	return 1;
-}
-
-
-
-AMX_NATIVE_INFO PluginNatives[] =
-{
-	{"mail_init", n_mail_init},
-    	{"mail_send", n_mail_send},
-    	{NULL, NULL}
-};
-
-
-
 PLUGIN_EXPORT int PLUGIN_CALL AmxLoad(AMX *amx) 
 {
-	mail_amx_list.push_back(amx);
+	amxList.push_back(amx);
 
-    	return amx_Register(amx, PluginNatives, -1);
+    return amx_Register(amx, amxNatives::MailNatives, -1);
 }
 
 
 
 PLUGIN_EXPORT int PLUGIN_CALL AmxUnload(AMX *amx) 
 {
-	for(std::list<AMX*>::iterator i = mail_amx_list.begin(); i != mail_amx_list.end(); i++) 
+	for(std::list<AMX*>::iterator i = amxList.begin(); i != amxList.end(); i++) 
 	{
 		if(*i == amx) 
 		{
-			mail_amx_list.erase(i);
+			amxList.erase(i);
 
 			break;
 		}
 	}
 
-    	return AMX_ERR_NONE;
-} 
-
-
-
-void lockMutex()
-{
-	#ifdef WIN32
-		WaitForSingleObject(mutexHandle, INFINITE);
-	#else
-		pthread_mutex_lock(&mutexHandle);
-	#endif
+    return AMX_ERR_NONE;
 }
 
 
 
-void unlockMutex()
+PLUGIN_EXPORT void PLUGIN_CALL ProcessTick()
 {
-	#ifdef WIN32
-		ReleaseMutex(mutexHandle);
-	#else
-		pthread_mutex_unlock(&mutexHandle);
-	#endif
+	if(!amxProcessTickQueue.empty())
+	{
+		int amx_idx;
+		cell amxAddress[3];
+
+		mailData getme;
+		std::list<AMX *>::iterator amx;
+
+		for(unsigned int i = 0; i < amxProcessTickQueue.size(); i++)
+		{
+			boost::mutex::scoped_lock lock(gMutex);
+			getme = amxProcessTickQueue.front();
+			amxProcessTickQueue.pop();
+			lock.unlock();
+
+			if(getme.errorCode == 250)
+			{
+				for(amx = amxList.begin(); amx != amxList.end(); amx++)
+				{
+					//forward OnMailSendSuccess(index, to[], subject[], message[], type);
+					if(!amx_FindPublic(*amx, "OnMailSendSuccess", &amx_idx))
+					{
+						amx_Push(*amx, getme.type);
+						amx_PushString(*amx, &amxAddress[0], NULL, getme.message.c_str(), NULL, NULL);
+						amx_PushString(*amx, &amxAddress[1], NULL, getme.subject.c_str(), NULL, NULL);
+						amx_PushString(*amx, &amxAddress[2], NULL, getme.to.c_str(), NULL, NULL);
+						amx_Push(*amx, getme.index);
+
+						amx_Exec(*amx, NULL, amx_idx);
+
+						amx_Release(*amx, amxAddress[2]);
+						amx_Release(*amx, amxAddress[1]);
+						amx_Release(*amx, amxAddress[0]);
+					}
+				}
+			}
+			else
+			{
+				cell addAddress;
+
+				for(amx = amxList.begin(); amx != amxList.end(); amx++)
+				{
+					//forward OnMailSendError(index, to[], subject[], message[], type, error[], error_code);
+					if(!amx_FindPublic(*amx, "OnMailSendError", &amx_idx))
+					{
+						amx_Push(*amx, getme.errorCode);
+						amx_PushString(*amx, &amxAddress[0], NULL, getme.error.c_str(), NULL, NULL);
+						amx_Push(*amx, getme.type);
+						amx_PushString(*amx, &amxAddress[1], NULL, getme.message.c_str(), NULL, NULL);
+						amx_PushString(*amx, &amxAddress[2], NULL, getme.subject.c_str(), NULL, NULL);
+						amx_PushString(*amx, &addAddress, NULL, getme.to.c_str(), NULL, NULL);
+						amx_Push(*amx, getme.index);
+
+						amx_Exec(*amx, NULL, amx_idx);
+						
+						amx_Release(*amx, addAddress);
+						amx_Release(*amx, amxAddress[2]);
+						amx_Release(*amx, amxAddress[1]);
+						amx_Release(*amx, amxAddress[0]);
+					}
+				}
+			}
+		}
+	}
 }
