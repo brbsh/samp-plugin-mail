@@ -38,7 +38,6 @@ PLUGIN_EXPORT bool PLUGIN_CALL Load(void **ppData)
 
 	gExpression = "[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?";
 	gProcess = new amxProcess();
-	boost::thread mail(&amxProcess::Thread);
 
 	logprintf("  Mail plugin loaded");
 
@@ -49,7 +48,7 @@ PLUGIN_EXPORT bool PLUGIN_CALL Load(void **ppData)
 
 PLUGIN_EXPORT void PLUGIN_CALL Unload()
 {
-	delete[] gProcess;
+	delete gProcess;
 	amxList.clear();
 
 	logprintf("  Mail plugin unloaded");

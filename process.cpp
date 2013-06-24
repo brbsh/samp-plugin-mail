@@ -20,6 +20,8 @@ extern std::queue<mailData> amxProcessTickQueue;
 amxProcess::amxProcess()
 {
 	this->Active = true;
+
+	boost::thread mail(&amxProcess::Thread);
 }
 
 
