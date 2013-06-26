@@ -12,7 +12,7 @@ logprintf_t logprintf;
 
 extern void *pAMXFunctions;
 extern amxProcess *gProcess;
-
+bool init=0;
 boost::mutex gMutex;
 boost::regex gExpression;
 

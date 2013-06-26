@@ -10,7 +10,7 @@
 
 extern logprintf_t logprintf;
 extern amxProcess *gProcess;
-
+extern bool init;
 extern boost::regex gExpression;
 extern std::queue<mailData> amxThreadQueue;
 
@@ -105,7 +105,7 @@ cell AMX_NATIVE_CALL amxNatives::Init(AMX *amx, cell *params)
 	lock.lock();
 	gProcess->Config["sendername"] = std::string(dest);
 	lock.unlock();
-
+	init=1;
 	return 1;
 }
 
@@ -114,6 +114,12 @@ cell AMX_NATIVE_CALL amxNatives::Init(AMX *amx, cell *params)
 // native mail_send(index, to[], subject[], messsage[], type = 0);
 cell AMX_NATIVE_CALL amxNatives::Send(AMX *amx, cell *params)
 {
+	if(!init)
+	{
+		logprintf("Mail error: Can't send any mail. Init phase failed");
+
+		return NULL;
+	}
 	mailData pushme;
 	char *dest = NULL;
 
