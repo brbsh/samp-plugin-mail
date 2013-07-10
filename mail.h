@@ -12,7 +12,6 @@
 
 #include <boost/regex.hpp>
 #include <boost/thread.hpp>
-#include <boost/thread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 
 #define HAVE_STDINT_H

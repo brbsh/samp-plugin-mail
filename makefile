@@ -10,5 +10,5 @@ all:
 	$(GPP) $(COMPILE_FLAGS) ./SDK/*.cpp
 	$(GPP) $(COMPILE_FLAGS) ./jwsmtp/*.cpp
 	$(GPP) $(COMPILE_FLAGS) *.cpp
-	$(GPP) -O2 -fshort-wchar -shared -o $(OUTFILE) *.o
+	$(GPP) -O2 -fshort-wchar -shared -o $(OUTFILE) *.o ./lib/boost/libboost_thread.a ./lib/boost/libboost_regex.a
 	rm -f *.o
