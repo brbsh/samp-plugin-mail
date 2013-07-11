@@ -12,7 +12,9 @@ logprintf_t logprintf;
 
 extern void *pAMXFunctions;
 extern amxProcess *gProcess;
-bool init=0;
+
+bool init = false;
+
 boost::mutex gMutex;
 boost::regex gExpression;
 
@@ -35,7 +37,7 @@ PLUGIN_EXPORT bool PLUGIN_CALL Load(void **ppData)
 {
     pAMXFunctions = ppData[PLUGIN_DATA_AMX_EXPORTS];
     logprintf = (logprintf_t)ppData[PLUGIN_DATA_LOGPRINTF];
-	gExpression= "[a-zA-Z0-9_\\.]+@([a-zA-Z0-9\\-]+\\.)+[a-zA-Z]{2,4}";
+	gExpression = "[a-zA-Z0-9_\\.]+@([a-zA-Z0-9\\-]+\\.)+[a-zA-Z]{2,4}";
 	gProcess = new amxProcess();
 	logprintf("  Mail plugin loaded");
     return true;
