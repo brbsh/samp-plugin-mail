@@ -10,7 +10,9 @@
 
 extern logprintf_t logprintf;
 extern amxProcess *gProcess;
+
 extern bool init;
+
 extern boost::regex gExpression;
 extern std::queue<mailData> amxThreadQueue;
 
@@ -105,7 +107,9 @@ cell AMX_NATIVE_CALL amxNatives::Init(AMX *amx, cell *params)
 	lock.lock();
 	gProcess->Config["sendername"] = std::string(dest);
 	lock.unlock();
-	init=1;
+	
+	init = true;
+	
 	return 1;
 }
 
@@ -120,6 +124,7 @@ cell AMX_NATIVE_CALL amxNatives::Send(AMX *amx, cell *params)
 
 		return NULL;
 	}
+	
 	mailData pushme;
 	char *dest = NULL;
 
