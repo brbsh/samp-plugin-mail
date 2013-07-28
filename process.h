@@ -20,6 +20,5 @@ public:
 
 	bool Active;
 
-	boost::mutex Mutex;
 	boost::unordered_map<std::string, std::string> Config;
 };

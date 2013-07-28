@@ -1,15 +1,18 @@
 #pragma once
 #pragma warning(disable:4996)
 
+#define _CRT_SECURE_NO_WARNINGS
+
 
 
 #include <stdint.h>
 #include <stdlib.h>
 #include <iostream>
-#include <map>
 #include <list>
 #include <queue>
 
+//#include <boost/atomic.hpp>
+#include <boost/bind.hpp>
 #include <boost/regex.hpp>
 #include <boost/thread.hpp>
 #include <boost/unordered_map.hpp>
@@ -21,19 +24,7 @@
 
 #include "natives.h"
 #include "process.h"
-
-
-
-
-
-//Kye's sleep macro
-#ifdef WIN32
-	#define SLEEP(x) { Sleep(x); }
-#else
-	#define SLEEP(x) { usleep(x * 1000); }
-	typedef unsigned long DWORD;
-	typedef unsigned int UINT;
-#endif
+#include "safe_queue.h"
 
 
 
@@ -48,10 +39,11 @@ typedef void (*logprintf_t)(char *format, ...);
 struct mailData
 {
 	int index;
+	int type;
+	int errorCode;
+
 	std::string to;
 	std::string subject;
 	std::string message;
-	int type;
 	std::string error;
-	int errorCode;
 };

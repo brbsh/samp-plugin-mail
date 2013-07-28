@@ -8,19 +8,20 @@
 
 
 
+extern bool gInit;
 extern logprintf_t logprintf;
 extern amxProcess *gProcess;
 
-extern bool init;
-
+extern boost::mutex gMutex;
 extern boost::regex gExpression;
-extern std::queue<mailData> amxThreadQueue;
+//extern boost::atomic<bool> gInit;
+extern boost::safe_queue<mailData> amxThreadQueue;
 
 
 
 
 
-const AMX_NATIVE_INFO amxNatives::MailNatives[] =
+const AMX_NATIVE_INFO amxNatives::mailNatives[] =
 {
 	{"mail_init", amxNatives::Init},
     {"mail_send", amxNatives::Send},
@@ -45,8 +46,8 @@ cell AMX_NATIVE_CALL amxNatives::Init(AMX *amx, cell *params)
 		return NULL;
 	}
 
-	boost::mutex::scoped_lock lock(gProcess->Mutex);
-	gProcess->Config["host"] = std::string(dest);
+	boost::mutex::scoped_lock lock(gMutex);
+	gProcess->Config["host"] = dest;
 	lock.unlock();
 
 	amx_StrParam(amx, params[2], dest);
@@ -59,7 +60,7 @@ cell AMX_NATIVE_CALL amxNatives::Init(AMX *amx, cell *params)
 	}
 
 	lock.lock();
-	gProcess->Config["user"] = std::string(dest);
+	gProcess->Config["user"] = dest;
 	lock.unlock();
 
 	amx_StrParam(amx, params[3], dest);
@@ -72,7 +73,7 @@ cell AMX_NATIVE_CALL amxNatives::Init(AMX *amx, cell *params)
 	}
 
 	lock.lock();
-	gProcess->Config["password"] = std::string(dest);
+	gProcess->Config["password"] = dest;
 	lock.unlock();
 
 	amx_StrParam(amx, params[4], dest);
@@ -92,7 +93,7 @@ cell AMX_NATIVE_CALL amxNatives::Init(AMX *amx, cell *params)
 	}
 
 	lock.lock();
-	gProcess->Config["from"] = std::string(dest);
+	gProcess->Config["from"] = dest;
 	lock.unlock();
 
 	amx_StrParam(amx, params[5], dest);
@@ -105,10 +106,10 @@ cell AMX_NATIVE_CALL amxNatives::Init(AMX *amx, cell *params)
 	}
 
 	lock.lock();
-	gProcess->Config["sendername"] = std::string(dest);
+	gProcess->Config["sendername"] = dest;
 	lock.unlock();
 	
-	init = true;
+	gInit = true;
 	
 	return 1;
 }
@@ -118,16 +119,17 @@ cell AMX_NATIVE_CALL amxNatives::Init(AMX *amx, cell *params)
 // native mail_send(index, to[], subject[], messsage[], type = 0);
 cell AMX_NATIVE_CALL amxNatives::Send(AMX *amx, cell *params)
 {
-	if(!init)
+	if(!gInit)
 	{
 		logprintf("Mail error: Can't send any mail. Init phase failed");
 
 		return NULL;
 	}
-	
-	mailData pushme;
+
 	char *dest = NULL;
 
+	mailData pushme;
+	
 	pushme.index = params[1];
 	amx_StrParam(amx, params[2], dest);
 
@@ -171,9 +173,7 @@ cell AMX_NATIVE_CALL amxNatives::Send(AMX *amx, cell *params)
 	pushme.error.clear();
 	pushme.errorCode = 1;
 
-	boost::mutex::scoped_lock lock(gProcess->Mutex);
 	amxThreadQueue.push(pushme);
-	lock.unlock();
 
 	return 1;
 }
