@@ -12,8 +12,8 @@ amxProcess *gProcess;
 
 extern logprintf_t logprintf;
 
-extern boost::safe_queue<mailData> amxThreadQueue;
-extern boost::safe_queue<mailData> amxProcessTickQueue;
+extern std::queue<mailData> amxThreadQueue;
+extern std::queue<mailData> amxProcessTickQueue;
 
 
 
@@ -37,17 +37,20 @@ amxProcess::~amxProcess()
 
 void amxProcess::Thread()
 {
-	boost::mutex tMutex;
+	boost::mutex localMutex;
 
 	do
 	{
-		if(!amxThreadQueue.empty())
+		while(!amxThreadQueue.empty())
 		{
 			mailData data;
 
 			jwsmtp::mailer mail;
 
-			data = amxThreadQueue.pop();
+			boost::mutex::scoped_lock lock(localMutex);
+			data = amxThreadQueue.front();
+			amxThreadQueue.pop();
+			lock.unlock();
 
 			mail.addrecipient(data.to);
 			mail.setsubject(data.subject);
@@ -55,7 +58,6 @@ void amxProcess::Thread()
 
 			mail.setsender(gProcess->Config.find("from")->second);
 			mail.setsendername(gProcess->Config.find("sendername")->second);
-
 			mail.setserver(gProcess->Config.find("host")->second);
 			mail.username(gProcess->Config.find("user")->second);
 			mail.password(gProcess->Config.find("password")->second);
@@ -71,7 +73,9 @@ void amxProcess::Thread()
 			data.error.assign(mail.response());
 			data.errorCode = atoi(data.error.c_str());
 
+			lock.lock();
 			amxProcessTickQueue.push(data);
+			lock.unlock();
 		}
 
 		boost::this_thread::sleep(boost::posix_time::milliseconds(1));

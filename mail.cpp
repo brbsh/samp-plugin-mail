@@ -9,13 +9,14 @@
 
 
 bool gInit;
+
 logprintf_t logprintf;
 
 boost::mutex gMutex;
 boost::regex gExpression;
 //boost::atomic<bool> gInit;
-boost::safe_queue<mailData> amxThreadQueue;
-boost::safe_queue<mailData> amxProcessTickQueue;
+std::queue<mailData> amxThreadQueue;
+std::queue<mailData> amxProcessTickQueue;
 std::list<AMX *> amxList;
 
 
@@ -41,7 +42,7 @@ PLUGIN_EXPORT bool PLUGIN_CALL Load(void **ppData)
 	gExpression = "[a-zA-Z0-9_\\.]+@([a-zA-Z0-9\\-]+\\.)+[a-zA-Z]{2,4}";
 	gProcess = new amxProcess();
 
-	logprintf("  Mail plugin v1.3.5 loaded");
+	logprintf("  Mail v%s by BJIADOKC loaded", PLUGIN_VERSION);
 
     return true;
 }
@@ -50,11 +51,11 @@ PLUGIN_EXPORT bool PLUGIN_CALL Load(void **ppData)
 
 PLUGIN_EXPORT void PLUGIN_CALL Unload()
 {
-	delete gProcess;
-
 	amxList.clear();
 
-	logprintf("  Mail plugin v1.3.5 unloaded");
+	logprintf("  Mail v%s by BJIADOKC unloaded", PLUGIN_VERSION);
+
+	delete gProcess;
 }
 
 
@@ -87,19 +88,23 @@ PLUGIN_EXPORT int PLUGIN_CALL AmxUnload(AMX *amx)
 
 PLUGIN_EXPORT void PLUGIN_CALL ProcessTick()
 {
-	if(!amxProcessTickQueue.empty())
+	while(!amxProcessTickQueue.empty())
 	{
 		int amx_idx;
+
 		cell amxAddress[3];
-
 		mailData getme;
-		std::list<AMX *>::iterator amx;
 
-		getme = amxProcessTickQueue.pop();
+		std::list<AMX *>::iterator end = amxList.end();
+
+		boost::mutex::scoped_lock lock(gMutex);
+		getme = amxProcessTickQueue.front();
+		amxProcessTickQueue.pop();
+		lock.unlock();
 
 		if(getme.errorCode == 250)
 		{
-			for(amx = amxList.begin(); amx != amxList.end(); amx++)
+			for(std::list<AMX *>::iterator amx = amxList.begin(); amx != end; amx++)
 			{
 				//forward OnMailSendSuccess(index, to[], subject[], message[], type);
 				if(!amx_FindPublic(*amx, "OnMailSendSuccess", &amx_idx))
@@ -122,7 +127,7 @@ PLUGIN_EXPORT void PLUGIN_CALL ProcessTick()
 		{
 			cell addAddress;
 
-			for(amx = amxList.begin(); amx != amxList.end(); amx++)
+			for(std::list<AMX *>::iterator amx = amxList.begin(); amx != end; amx++)
 			{
 				//forward OnMailSendError(index, to[], subject[], message[], type, error[], error_code);
 				if(!amx_FindPublic(*amx, "OnMailSendError", &amx_idx))

@@ -9,13 +9,14 @@
 
 
 extern bool gInit;
+
 extern logprintf_t logprintf;
 extern amxProcess *gProcess;
 
 extern boost::mutex gMutex;
 extern boost::regex gExpression;
 //extern boost::atomic<bool> gInit;
-extern boost::safe_queue<mailData> amxThreadQueue;
+extern std::queue<mailData> amxThreadQueue;
 
 
 
@@ -35,6 +36,13 @@ const AMX_NATIVE_INFO amxNatives::mailNatives[] =
 //native mail_init(host[], user[], password[], from[], sendername[]);
 cell AMX_NATIVE_CALL amxNatives::Init(AMX *amx, cell *params)
 {
+	if(!arguments(5))
+	{
+		logprintf("Mail warning: Number of arguments in native 'mail_init' does not conform to definition");
+
+		return NULL;
+	}
+
 	char *dest = NULL;
 
 	amx_StrParam(amx, params[1], dest);
@@ -119,6 +127,13 @@ cell AMX_NATIVE_CALL amxNatives::Init(AMX *amx, cell *params)
 // native mail_send(index, to[], subject[], messsage[], type = 0);
 cell AMX_NATIVE_CALL amxNatives::Send(AMX *amx, cell *params)
 {
+	if(!arguments(5))
+	{
+		logprintf("Mail warning: Number of arguments in native 'mail_send' does not conform to definition");
+
+		return NULL;
+	}
+
 	if(!gInit)
 	{
 		logprintf("Mail error: Can't send any mail. Init phase failed");
@@ -173,7 +188,9 @@ cell AMX_NATIVE_CALL amxNatives::Send(AMX *amx, cell *params)
 	pushme.error.clear();
 	pushme.errorCode = 1;
 
+	boost::mutex::scoped_lock lock(gMutex);
 	amxThreadQueue.push(pushme);
+	lock.unlock();
 
 	return 1;
 }
@@ -183,6 +200,13 @@ cell AMX_NATIVE_CALL amxNatives::Send(AMX *amx, cell *params)
 // native mail_is_valid(address[]);
 cell AMX_NATIVE_CALL amxNatives::IsValid(AMX *amx, cell *params)
 {
+	if(!arguments(1))
+	{
+		logprintf("Mail warning: Number of arguments in native 'mail_is_valid' does not conform to definition");
+
+		return NULL;
+	}
+
 	char *email = NULL;
 
 	amx_StrParam(amx, params[1], email);

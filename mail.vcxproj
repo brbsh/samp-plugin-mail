@@ -82,7 +82,6 @@
     <ClInclude Include="mail.h" />
     <ClInclude Include="natives.h" />
     <ClInclude Include="process.h" />
-    <ClInclude Include="safe_queue.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="jwsmtp\base64.cpp" />

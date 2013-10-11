@@ -24,13 +24,18 @@
 
 #include "natives.h"
 #include "process.h"
-#include "safe_queue.h"
 
 
 
 
 
 typedef void (*logprintf_t)(char *format, ...);
+
+
+#define PLUGIN_VERSION "1.4"
+
+#define arguments(a) \
+	!(params[0] != (a << 2))
 
 
 
